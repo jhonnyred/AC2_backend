@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Controle de Projetos</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #f2f4f7;
+            color: #1f2937;
+        }
+        header {
+            background: #1e3a5f;
+            color: #fff;
+            padding: 18px 32px;
+        }
+        header h1 { margin: 0; font-size: 22px; }
+        main {
+            max-width: 1000px;
+            margin: 24px auto;
+            padding: 0 16px;
+            display: grid;
+            gap: 24px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .card h2 { margin-top: 0; font-size: 18px; }
+        form {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+        }
+        label { display: flex; flex-direction: column; font-size: 13px; gap: 4px; }
+        input {
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            padding: 9px 18px;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #94a3b8; cursor: default; }
+        .mensagem {
+            margin-top: 14px;
+            padding: 10px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: none;
+        }
+        .mensagem.erro { display: block; background: #fee2e2; color: #991b1b; }
+        .mensagem.sucesso { display: block; background: #dcfce7; color: #166534; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e5e7eb; }
+        th { background: #f8fafc; }
+        .vazio { color: #64748b; text-align: center; }
+        .em-andamento { color: #64748b; font-style: italic; }
+        @media (max-width: 700px) {
+            form { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Controle de Projetos</h1>
+    </header>
+
+    <main>
+        <section class="card">
+            <h2>Novo projeto</h2>
+            <form id="formProjeto">
+                <label>
+                    Descrição
+                    <input type="text" id="descricao" maxlength="200">
+                </label>
+                <label>
+                    Data de início
+                    <input type="date" id="dataInicio">
+                </label>
+                <label>
+                    Data de fim
+                    <input type="date" id="dataFim">
+                </label>
+                <button type="submit" id="btnSalvar">Salvar</button>
+            </form>
+            <div id="mensagem" class="mensagem"></div>
+        </section>
+
+        <section class="card">
+            <h2>Projetos cadastrados</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Descrição</th>
+                        <th>Início</th>
+                        <th>Fim</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaProjetos"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        const API = "http://localhost:8081/api/projeto";
+
+        const form = document.getElementById("formProjeto");
+        const mensagem = document.getElementById("mensagem");
+        const tabela = document.getElementById("tabelaProjetos");
+        const btnSalvar = document.getElementById("btnSalvar");
+
+        function mostrarMensagem(texto, tipo) {
+            mensagem.textContent = texto;
+            mensagem.className = "mensagem " + tipo;
+        }
+
+        function formatarData(data) {
+            if (!data) return null;
+            const [ano, mes, dia] = data.split("-");
+            return `${dia}/${mes}/${ano}`;
+        }
+
+        async function lerErro(resposta) {
+            try {
+                const corpo = await resposta.json();
+                if (corpo.errors && corpo.errors.length > 0) {
+                    return corpo.errors.join(", ");
+                }
+            } catch (e) {
+            }
+            return "Erro ao comunicar com o servidor (status " + resposta.status + ")";
+        }
+
+        async function carregarProjetos() {
+            try {
+                const resposta = await fetch(API);
+                if (!resposta.ok) {
+                    mostrarMensagem(await lerErro(resposta), "erro");
+                    return;
+                }
+                const projetos = await resposta.json();
+                tabela.innerHTML = "";
+
+                if (projetos.length === 0) {
+                    tabela.innerHTML = '<tr><td colspan="4" class="vazio">Nenhum projeto cadastrado</td></tr>';
+                    return;
+                }
+
+                projetos.forEach(p => {
+                    const linha = document.createElement("tr");
+
+                    const tdId = document.createElement("td");
+                    tdId.textContent = p.id;
+
+                    const tdDescricao = document.createElement("td");
+                    tdDescricao.textContent = p.descricao;
+
+                    const tdInicio = document.createElement("td");
+                    tdInicio.textContent = formatarData(p.dataInicio);
+
+                    const tdFim = document.createElement("td");
+                    const fim = formatarData(p.dataFim);
+                    if (fim) {
+                        tdFim.textContent = fim;
+                    } else {
+                        tdFim.textContent = "Em andamento";
+                        tdFim.className = "em-andamento";
+                    }
+
+                    linha.append(tdId, tdDescricao, tdInicio, tdFim);
+                    tabela.appendChild(linha);
+                });
+            } catch (e) {
+                mostrarMensagem("Não foi possível conectar à API. Verifique se o backend está rodando.", "erro");
+            }
+        }
+
+        form.addEventListener("submit", async (evento) => {
+            evento.preventDefault();
+
+            const projeto = {
+                descricao: document.getElementById("descricao").value,
+                dataInicio: document.getElementById("dataInicio").value || null,
+                dataFim: document.getElementById("dataFim").value || null
+            };
+
+            btnSalvar.disabled = true;
+            try {
+                const resposta = await fetch(API, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(projeto)
+                });
+
+                if (!resposta.ok) {
+                    mostrarMensagem(await lerErro(resposta), "erro");
+                    return;
+                }
+
+                mostrarMensagem("Projeto cadastrado com sucesso.", "sucesso");
+                form.reset();
+                carregarProjetos();
+            } catch (e) {
+                mostrarMensagem("Não foi possível conectar à API. Verifique se o backend está rodando.", "erro");
+            } finally {
+                btnSalvar.disabled = false;
+            }
+        });
+
+        carregarProjetos();
+    </script>
+</body>
+</html>
